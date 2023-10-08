@@ -1,0 +1,19 @@
+[package]
+name = "parser"
+version = "0.0.0"
+description = "parses"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ast.workspace = true
+pest = "2.7.4"
+pest_derive = "2.7.4"
+pratt = "0.4.0"
+smol_str.workspace = true
+
+[dev-dependencies]
+expect-test = "1.4.1"

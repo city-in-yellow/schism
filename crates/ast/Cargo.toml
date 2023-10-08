@@ -1,0 +1,12 @@
+[package]
+name = "ast"
+version = "0.0.0"
+description = "asts"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+smol_str.workspace = true

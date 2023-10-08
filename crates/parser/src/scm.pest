@@ -1,0 +1,13 @@
+ident = @{ LOWERCASE_LETTER ~ (LETTER | NUMBER | "_")* }
+number = @{ ASCII_DIGIT+ }
+die = { number? ~ ^"d" ~ number }
+
+group   =  { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
+infix   =  { "+" | "-" | "*" | "/" | "=" | "^" }
+prefix  =  { "-" | "!" }
+postfix =  { "?" }
+primary = _{ assignment | "(" ~ group ~ ")" | die | ident | number }
+
+assignment = { ident ~ "is" ~ group ~ "." ~ group }
+
+WHITESPACE =  _{ " " | "\t" | NEWLINE }
