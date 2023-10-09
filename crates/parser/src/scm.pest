@@ -1,12 +1,16 @@
 ident = @{ LOWERCASE_LETTER ~ (LETTER | NUMBER | "_")* }
 number = @{ ASCII_DIGIT+ }
-die = { number? ~ ^"d" ~ number }
+die = ${ number? ~ ^"d" ~ number }
+
+empty_list = _{ "[" ~ "]" }
+poplated_list = _{ "[" ~ group ~ ("," ~ group)* ~ ","? ~ "]" }
+list = { empty_list | poplated_list }
 
 group   =  { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
 infix   =  { "+" | "-" | "*" | "/" | "=" | "^" }
 prefix  =  { "-" | "!" }
 postfix =  { "?" }
-primary = _{ assignment | "(" ~ group ~ ")" | die | ident | number }
+primary = _{ assignment | "(" ~ group ~ ")" | list | die | ident | number }
 
 assignment = { ident ~ "is" ~ group ~ "." ~ group }
 
