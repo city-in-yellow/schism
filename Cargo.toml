@@ -19,6 +19,8 @@ debug = 0
 
 [workspace.dependencies]
 ast = { path = "crates/ast" }
+errors = { path = "crates/errors" }
 parser = { path = "crates/parser" }
 
+ariadne = { version = "0.3.0", features = ["auto-color"] }
 smol_str = "0.2.0"

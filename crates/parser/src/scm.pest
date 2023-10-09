@@ -1,6 +1,7 @@
-ident = @{ LOWERCASE_LETTER ~ (LETTER | NUMBER | "_")* }
+ident = @{ !"is" ~ LOWERCASE_LETTER ~ (LETTER | NUMBER | "_")* }
 number = @{ ASCII_DIGIT+ }
 die = ${ number? ~ ^"d" ~ number }
+unit = @{ "(" ~ ")" }
 
 empty_list = _{ "[" ~ "]" }
 poplated_list = _{ "[" ~ group ~ ("," ~ group)* ~ ","? ~ "]" }
@@ -10,8 +11,25 @@ group   =  { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix
 infix   =  { "+" | "-" | "*" | "/" | "=" | "^" }
 prefix  =  { "-" | "!" }
 postfix =  { "?" }
-primary = _{ assignment | "(" ~ group ~ ")" | list | die | ident | number }
+primary = _{ 
+    function_assignment 
+    | assignment 
+    | function_call
+    | unit
+    | "(" ~ group ~ ")" 
+    | list 
+    | die 
+    | ident 
+    | number 
+}
 
 assignment = { ident ~ "is" ~ group ~ "." ~ group }
 
+param_list = { ident+ }
+function_assignment = { ident ~ param_list ~ "is" ~ group ~ "." ~ group }
+
+function_call_list = { group+ }
+function_call = { ident ~ function_call_list }
+
+entry = _{ SOI ~ group ~ EOI }
 WHITESPACE =  _{ " " | "\t" | NEWLINE }

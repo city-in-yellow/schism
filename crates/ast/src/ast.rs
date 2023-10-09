@@ -4,6 +4,7 @@ use crate::trivia::{Trivia, WithTrivia};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Atom {
+    Unit,
     Ident(SmolStr),
     Number(usize),
     Die(usize, usize),
@@ -15,6 +16,7 @@ impl WithTrivia for Trivia<Atom> {
         let buffer = String::from_utf8(vec![b' '; indent]).unwrap();
 
         match &self.inner {
+            Atom::Unit => format!("{buffer}() {}..{}", self.span.start, self.span.end),
             Atom::Ident(ident) => format!("{buffer}{ident} {}..{}", self.span.start, self.span.end),
             Atom::Number(number) => {
                 format!("{buffer}{number} {}..{}", self.span.start, self.span.end)
@@ -92,12 +94,46 @@ impl WithTrivia for Trivia<Postfix> {
     }
 }
 
+pub type ParameterList = Vec<Trivia<SmolStr>>;
+
+impl WithTrivia for Trivia<ParameterList> {
+    fn pretty_string(&self, indent: usize) -> String {
+        let buffer = String::from_utf8(vec![b' '; indent]).unwrap();
+
+        let line = format!("{buffer}ParamList {}..{}", self.span.start, self.span.end);
+        let mut lines: Vec<String> = self
+            .inner
+            .iter()
+            .map(|param| {
+                tagged_pretty_string(
+                    &param.inner,
+                    "Param",
+                    param.span.start,
+                    param.span.end,
+                    indent + 2,
+                )
+            })
+            .collect();
+
+        lines.insert(0, line);
+
+        lines.join("\n")
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Expr {
     InfixExpr(Trivia<Box<Expr>>, Trivia<Infix>, Trivia<Box<Expr>>),
     PrefixExpr(Trivia<Prefix>, Trivia<Box<Expr>>),
     PostfixExpr(Trivia<Box<Expr>>, Trivia<Postfix>),
     Assignment(Trivia<SmolStr>, Trivia<Box<Expr>>, Trivia<Box<Expr>>),
+    FunctionAssignment(
+        Trivia<SmolStr>,
+        Trivia<ParameterList>,
+        Trivia<Box<Expr>>,
+        Trivia<Box<Expr>>,
+    ),
+    FunctionCall(Trivia<SmolStr>, Vec<Trivia<Box<Expr>>>),
     Atom(Trivia<Atom>),
 }
 
@@ -133,18 +169,62 @@ impl WithTrivia for Trivia<Box<Expr>> {
             box Expr::Assignment(ident, expr, rest) => {
                 let buffer = String::from_utf8(vec![b' '; indent]).unwrap();
 
-                let child_buffer = String::from_utf8(vec![b' '; indent + 2]).unwrap();
-                let ident = format!(
-                    "{child_buffer}LValue({}) {}..{}",
-                    ident.inner, ident.span.start, ident.span.end
+                let ident = tagged_pretty_string(
+                    &ident.inner,
+                    "Name",
+                    ident.span.start,
+                    ident.span.end,
+                    indent + 2,
                 );
-
                 let expr = expr.pretty_string(indent + 2);
                 let rest = rest.pretty_string(indent + 2);
                 let line = format!("{buffer}Assign {}..{}", self.span.start, self.span.end);
 
                 vec![line, ident, expr, rest].join("\n")
             }
+            box Expr::FunctionAssignment(ident, parameters, expr, rest) => {
+                let buffer = String::from_utf8(vec![b' '; indent]).unwrap();
+
+                let ident = tagged_pretty_string(
+                    &ident.inner,
+                    "Name",
+                    ident.span.start,
+                    ident.span.end,
+                    indent + 2,
+                );
+                let params = parameters.pretty_string(indent + 2);
+                let expr = expr.pretty_string(indent + 2);
+                let rest = rest.pretty_string(indent + 2);
+                let line = format!("{buffer}FuncAssign {}..{}", self.span.start, self.span.end);
+
+                vec![line, ident, params, expr, rest].join("\n")
+            }
+            box Expr::FunctionCall(ident, arguments) => {
+                let buffer = String::from_utf8(vec![b' '; indent]).unwrap();
+
+                let ident = tagged_pretty_string(
+                    &ident.inner,
+                    "Name",
+                    ident.span.start,
+                    ident.span.end,
+                    indent + 2,
+                );
+
+                let line = format!("{buffer}FuncCall {}..{}", self.span.start, self.span.end);
+                let mut lines: Vec<String> = arguments
+                    .iter()
+                    .map(|x| x.pretty_string(indent + 2))
+                    .collect();
+                lines.insert(0, ident);
+                lines.insert(0, line);
+
+                lines.join("\n")
+            }
         }
     }
+}
+
+fn tagged_pretty_string(s: &SmolStr, tag: &str, start: usize, end: usize, indent: usize) -> String {
+    let buffer = String::from_utf8(vec![b' '; indent]).unwrap();
+    format!("{buffer}{tag}({s}) {}..{}", start, end)
 }

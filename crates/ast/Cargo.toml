@@ -9,4 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+# workspace deps
+
+# local deps
+
+# global deps
 smol_str.workspace = true
