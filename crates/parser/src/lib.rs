@@ -353,6 +353,53 @@ mod test {
     }
 
     #[test]
+    fn test_ordering() {
+        e(
+            indoc! {r#"
+                fn foo bar baz:
+                    let barbaz = bar + baz;
+                    let bazbar = bar * baz;
+                    bazbar - barbaz
+                ;
+                
+                foo 3 5
+            "#},
+            expect![[r#"
+                Assign 0..103
+                  Func 7..92
+                    Param(bar) 7..10
+                    Func 11..92
+                      Param(baz) 11..14
+                      Assign 20..92
+                        FuncCall 33..42
+                          FuncCall 33..38
+                            + 37..38
+                            bar 33..36
+                          baz 39..42
+                        Name(barbaz) 24..30
+                        Assign 48..92
+                          FuncCall 61..70
+                            FuncCall 61..66
+                              * 65..66
+                              bar 61..64
+                            baz 67..70
+                          Name(bazbar) 52..58
+                          FuncCall 76..91
+                            FuncCall 76..84
+                              - 83..84
+                              bazbar 76..82
+                            barbaz 85..91
+                  Name(foo) 3..6
+                  FuncCall 95..102
+                    FuncCall 95..100
+                      foo 95..98
+                      3 99..100
+                    5 101..102
+            "#]],
+        );
+    }
+
+    #[test]
     fn test_func() {
         e(
             indoc! {r#"

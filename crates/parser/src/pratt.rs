@@ -284,7 +284,7 @@ where
             (Rule::infix, "+" | "-") => Affix::Infix(Precedence(3), Associativity::Left),
             (Rule::infix, "*" | "/") => Affix::Infix(Precedence(4), Associativity::Left),
             (Rule::postfix, "?") => Affix::Postfix(Precedence(5)),
-            (Rule::prefix, "-" | "!") => Affix::Prefix(Precedence(6)),
+            (Rule::prefix, "!") => Affix::Prefix(Precedence(6)),
             (Rule::infix, "^") => Affix::Infix(Precedence(7), Associativity::Right),
             (Rule::infix, "..." | "..=") => Affix::Infix(Precedence(8), Associativity::Neither),
             (

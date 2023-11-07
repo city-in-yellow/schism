@@ -1,6 +1,6 @@
 ---
 source: crates/interpreter/src/test.rs
-expression: "e(r#\"1 + \"2\"\"#)"
+expression: "e(r#\"1 > (1 / 10)\"#)"
 ---
-"12" 0..7
+true 0..11
 

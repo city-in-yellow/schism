@@ -140,9 +140,38 @@ fn eval_function_call(ctx: Context, func: TExpr, arg: TExpr) -> Res {
             eval(func_ctx, body)
         }
         Trivia {
-            inner: Val::NativeFunction(NativeFunction { apply, params, .. }),
+            inner:
+                Val::NativeFunction(NativeFunction {
+                    name,
+                    apply,
+                    params,
+                    ..
+                }),
             span,
         } => {
+            // comparison short circuit
+            if let (
+                "or",
+                Some(Trivia {
+                    inner: Val::Bool(true),
+                    ..
+                }),
+            ) = (name.as_str(), params.first())
+            {
+                return Ok(new(Val::Bool(true), span));
+            }
+
+            if let (
+                "and",
+                Some(Trivia {
+                    inner: Val::Bool(false),
+                    ..
+                }),
+            ) = (name.as_str(), params.first())
+            {
+                return Ok(new(Val::Bool(false), span));
+            }
+
             let arg = eval(ctx.clone(), arg)?;
             apply(ctx, span, params, arg)
         }

@@ -1,0 +1,6 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(r#\"\"this is a test of our regularly scheduled broadcast\" * (0-1)\"#)"
+---
+"tsacdaorb deludehcs ylraluger ruo fo tset a si siht" 0..60
+

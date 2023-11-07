@@ -1,0 +1,9 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(r#\"3...6\"#)"
+---
+List 0..5
+  3 0..4
+  4 0..4
+  5 0..4
+

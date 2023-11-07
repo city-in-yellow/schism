@@ -14,7 +14,7 @@ list = { empty_list | poplated_list }
 
 group   =  { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
 infix   =  { "+" | "-" | "*" | "/" | "=" | "^" | "and" | "or" | ">=" | ">" | "<=" | "<" | "..." | "..=" }
-prefix  =  { "-" | "!" }
+prefix  =  { "!" }
 postfix =  { "?" }
 primary = _{ 
     for_expr

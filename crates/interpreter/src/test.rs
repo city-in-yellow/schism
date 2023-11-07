@@ -39,4 +39,17 @@ fn test() {
         
         foo 3 5 "a"
     "#}));
+    assert_snapshot!(e(r#"10 - 4"#));
+    assert_snapshot!(e(r#"0 - 12"#));
+    assert_snapshot!(e(r#"1 - [1, 2, 3]"#));
+    assert_snapshot!(e(r#""hello" - 1"#));
+    assert_snapshot!(e(
+        r#""this is a test of our regularly scheduled broadcast" * (0-1)"#
+    ));
+    assert_snapshot!(e(r#"5 / 2"#));
+    assert_snapshot!(e(r#"(1 / 10) + (2 / 10)"#));
+    assert_snapshot!(e(r#"1 > (1 / 10)"#));
+    assert_snapshot!(e(r#"1=1 or 1<=0"#));
+    assert_snapshot!(e(r#"3...6"#));
+    assert_snapshot!(e(r#"3..=6"#));
 }

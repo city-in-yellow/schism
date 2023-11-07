@@ -1,0 +1,14 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(r#\"\"hello\" - 1\"#)"
+---
+ꡃꡨꡀꡃꡕ: kaathe.encyc.sim.pat_err
+   ╭─[<unknown>:1:1]
+   │
+ 1 │ "hello" - 1
+   │ ───┬┬────  
+   │    ╰─────── expected one of (Number, Decimal, List) but this is type String
+   │     │      
+   │     ╰────── 「argument type is invalid」
+───╯
+

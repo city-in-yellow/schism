@@ -1,7 +1,7 @@
 use archery::ArcK;
 use errors::InterpretingError;
-use fixed::{types::extra::U24, FixedI32};
 use rpds::{HashTrieMap, List};
+use rug::Float;
 use smol_str::SmolStr;
 
 use crate::{
@@ -73,17 +73,19 @@ pub struct NativeFunction {
     pub apply: fn(Context, Range, List<TVal, ArcK>, TVal) -> RFunc,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Val {
     Unit,
     Bool(bool),
     String(SmolStr),
     Number(isize),
-    Decimal(FixedI32<U24>),
+    Decimal(Float),
     List(Vec<TVal>),
     Function(Context, Trivia<SmolStr>, TExpr),
     NativeFunction(NativeFunction),
 }
+
+impl Eq for Val {}
 
 impl Val {
     pub fn to_readable_type(&self) -> SmolStr {
@@ -115,7 +117,12 @@ impl WithTrivia for Trivia<Val> {
                 format!("{buffer}{number} {}..{}", self.span.start, self.span.end)
             }
             Val::Decimal(number) => {
-                format!("{buffer}{number} {}..{}", self.span.start, self.span.end)
+                format!(
+                    "{buffer}{} {}..{}",
+                    number.to_f32(),
+                    self.span.start,
+                    self.span.end
+                )
             }
             Val::List(list) => {
                 let line = format!("{buffer}List {}..{}", self.span.start, self.span.end);

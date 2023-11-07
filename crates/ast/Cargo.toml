@@ -19,3 +19,4 @@ archery = "1.0.0"
 fixed.workspace = true
 smol_str.workspace = true
 rpds.workspace = true
+rug.workspace = true
