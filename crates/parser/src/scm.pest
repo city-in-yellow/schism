@@ -1,6 +1,11 @@
-ident = @{ !"is" ~ LOWERCASE_LETTER ~ (LETTER | NUMBER | "_")* }
+banned_idents = @{ "is" | "if" | "then" | "and" | "or" | "for" | "as" | "do" | "let" | "fn" | "var" }
+good_idents = @{ LOWERCASE_LETTER ~ (LETTER | NUMBER | "_")* }
+ident = @{ !(banned_idents ~ WHITESPACE) ~ good_idents }
 number = @{ ASCII_DIGIT+ }
 die = ${ number? ~ ^"d" ~ number }
+
+string_internals = @{ (!"\"" ~ ANY)* }
+string = ${ "\"" ~ string_internals ~ "\"" }
 unit = @{ "(" ~ ")" }
 
 empty_list = _{ "[" ~ "]" }
@@ -8,28 +13,38 @@ poplated_list = _{ "[" ~ group ~ ("," ~ group)* ~ ","? ~ "]" }
 list = { empty_list | poplated_list }
 
 group   =  { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
-infix   =  { "+" | "-" | "*" | "/" | "=" | "^" }
+infix   =  { "+" | "-" | "*" | "/" | "=" | "^" | "and" | "or" | ">=" | ">" | "<=" | "<" | "..." | "..=" }
 prefix  =  { "-" | "!" }
 postfix =  { "?" }
 primary = _{ 
-    function_assignment 
+    for_expr
+    | function_assignment 
     | assignment 
-    | function_call
+    | if_expr
     | unit
     | "(" ~ group ~ ")" 
     | list 
     | die 
-    | ident 
     | number 
+    | string
+    | function_call
+    | ident 
 }
 
-assignment = { ident ~ "is" ~ group ~ "." ~ group }
+assignment = { ("let" | "var")? ~ ident ~ ("is" | "=") ~ group ~ ("." | ";") ~ group }
+always_case = { "else" ~ group }
+case = { "else" ~ group ~ "then" ~ group }
+if_head = { "if" ~ group ~ "then" ~ group }
+if_expr =  { if_head ~ (case | always_case)* }
+for_expr = { "for" ~ group ~ ("as" | "->") ~ ident ~ ("do" | ":") ~ group }
 
 param_list = { ident+ }
-function_assignment = { ident ~ param_list ~ "is" ~ group ~ "." ~ group }
+function_assignment = { ("let" | "fn")? ~ ident ~ param_list ~ ("is" | "=" | ":") ~ group ~ ("." | ";") ~ group }
 
-function_call_list = { group+ }
-function_call = { ident ~ function_call_list }
+function_call_inner = { group ~ function_call_inner? }
+function_call = { ident ~ function_call_inner }
 
 entry = _{ SOI ~ group ~ EOI }
+
+COMMENT = _{ "(*" ~ (!"*)" ~ ANY)* ~ "*)" }
 WHITESPACE =  _{ " " | "\t" | NEWLINE }

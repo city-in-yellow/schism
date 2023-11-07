@@ -2,4 +2,5 @@
 #![feature(box_patterns)]
 
 pub mod ast;
+pub mod hir;
 pub mod trivia;

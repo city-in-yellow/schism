@@ -177,9 +177,10 @@ mod test {
             "[ 4 + 6, 8, 33, 45, b, d20, keep_highest 1d6, x is 4. x * 2 ,x ]",
             expect![[r#"
                 List 0..64
-                  Expr 2..7
-                    4 2..3
-                    `+` 4..5
+                  FuncCall 2..7
+                    FuncCall 2..5
+                      + 4..5
+                      4 2..3
                     6 6..7
                   8 9..10
                   33 12..14
@@ -187,14 +188,15 @@ mod test {
                   b 20..21
                   1d20 23..26
                   FuncCall 28..44
-                    Name(keep_highest) 28..40
+                    keep_highest 28..40
                     1d6 41..44
                   Assign 46..60
-                    Name(x) 46..47
                     4 51..52
-                    Expr 54..59
-                      x 54..55
-                      `*` 56..57
+                    Name(x) 46..47
+                    FuncCall 54..59
+                      FuncCall 54..57
+                        * 56..57
+                        x 54..55
                       2 58..59
                   x 61..62
             "#]],
@@ -225,36 +227,42 @@ mod test {
         e(
             "1 + 2 * 3",
             expect![[r#"
-                Expr 0..9
-                  1 0..1
-                  `+` 2..3
-                  Expr 4..9
-                    2 4..5
-                    `*` 6..7
+                FuncCall 0..9
+                  FuncCall 0..3
+                    + 2..3
+                    1 0..1
+                  FuncCall 4..9
+                    FuncCall 4..7
+                      * 6..7
+                      2 4..5
                     3 8..9
             "#]],
         );
         e(
             "(1 + 2) * 3",
             expect![[r#"
-                Expr 1..11
-                  Expr 1..6
-                    1 1..2
-                    `+` 3..4
-                    2 5..6
-                  `*` 8..9
+                FuncCall 1..11
+                  FuncCall 1..9
+                    * 8..9
+                    FuncCall 1..6
+                      FuncCall 1..4
+                        + 3..4
+                        1 1..2
+                      2 5..6
                   3 10..11
             "#]],
         );
         e(
             "a / (7D30 + 6)",
             expect![[r#"
-                Expr 0..13
-                  a 0..1
-                  `/` 2..3
-                  Expr 5..13
-                    7d30 5..9
-                    `+` 10..11
+                FuncCall 0..13
+                  FuncCall 0..3
+                    / 2..3
+                    a 0..1
+                  FuncCall 5..13
+                    FuncCall 5..11
+                      + 10..11
+                      7d30 5..9
                     6 12..13
             "#]],
         );
@@ -262,8 +270,8 @@ mod test {
             "foo is 12. foo",
             expect![[r#"
                 Assign 0..14
-                  Name(foo) 0..3
                   12 7..9
+                  Name(foo) 0..3
                   foo 11..14
             "#]],
         );
@@ -271,11 +279,12 @@ mod test {
             "foo is D20 - 44. foo",
             expect![[r#"
                 Assign 0..20
-                  Name(foo) 0..3
-                  Expr 7..15
-                    1d20 7..10
-                    `-` 11..12
+                  FuncCall 7..15
+                    FuncCall 7..12
+                      - 11..12
+                      1d20 7..10
                     44 13..15
+                  Name(foo) 0..3
                   foo 17..20
             "#]],
         );
@@ -283,9 +292,10 @@ mod test {
             r#"[ 4 + 6, 8, 33, 45, b, d20, keep_highest 1d6, x is 4. x * 2 ,x ]"#,
             expect![[r#"
                 List 0..64
-                  Expr 2..7
-                    4 2..3
-                    `+` 4..5
+                  FuncCall 2..7
+                    FuncCall 2..5
+                      + 4..5
+                      4 2..3
                     6 6..7
                   8 9..10
                   33 12..14
@@ -293,14 +303,15 @@ mod test {
                   b 20..21
                   1d20 23..26
                   FuncCall 28..44
-                    Name(keep_highest) 28..40
+                    keep_highest 28..40
                     1d6 41..44
                   Assign 46..60
-                    Name(x) 46..47
                     4 51..52
-                    Expr 54..59
-                      x 54..55
-                      `*` 56..57
+                    Name(x) 46..47
+                    FuncCall 54..59
+                      FuncCall 54..57
+                        * 56..57
+                        x 54..55
                       2 58..59
                   x 61..62
             "#]],
@@ -317,23 +328,25 @@ mod test {
             "#,
             expect![[r#"
                 Assign 17..210
-                  Name(foo) 17..20
                   Assign 44..159
-                    Name(red) 44..47
                     42 51..53
+                    Name(red) 44..47
                     Assign 75..159
-                      Name(blue) 75..79
                       37 83..85
+                      Name(blue) 75..79
                       Assign 107..159
-                        Name(purple) 107..113
-                        Expr 117..127
-                          red 117..120
-                          `+` 121..122
+                        FuncCall 117..127
+                          FuncCall 117..122
+                            + 121..122
+                            red 117..120
                           blue 123..127
-                        Expr 149..159
-                          purple 149..155
-                          `*` 156..157
+                        Name(purple) 107..113
+                        FuncCall 149..159
+                          FuncCall 149..157
+                            * 156..157
+                            purple 149..155
                           2 158..159
+                  Name(foo) 17..20
                   foo 194..197
             "#]],
         );
@@ -343,21 +356,17 @@ mod test {
     fn test_func() {
         e(
             indoc! {r#"
-                foo bar is
-                    bar * 2.
-                
-                foo
+                foo bar is bar. foo 1
             "#},
             expect![[r#"
-                FuncAssign 0..29
-                  Name(foo) 0..3
-                  ParamList 4..8
+                Assign 0..22
+                  Func 4..14
                     Param(bar) 4..7
-                  Expr 15..22
-                    bar 15..18
-                    `*` 19..20
-                    2 21..22
-                  foo 25..28
+                    bar 11..14
+                  Name(foo) 0..3
+                  FuncCall 16..21
+                    foo 16..19
+                    1 20..21
             "#]],
         );
         e(
@@ -372,35 +381,165 @@ mod test {
                 take_highest d20
             "#},
             expect![[r#"
-                FuncAssign 0..139
-                  Name(take_highest) 0..12
-                  ParamList 13..17
+                Assign 0..139
+                  Func 13..119
                     Param(die) 13..16
-                  FuncAssign 24..119
-                    Name(roll) 24..28
-                    ParamList 29..33
-                      Param(die) 29..32
-                    FuncCall 44..50
-                      Name(die) 44..47
-                      () 48..50
-                    Assign 56..119
-                      Name(first) 56..61
-                      FuncCall 65..73
-                        Name(roll) 65..69
-                        die 70..73
-                      Assign 79..119
-                        Name(second) 79..85
-                        FuncCall 89..97
-                          Name(roll) 89..93
-                          die 94..97
-                        FuncCall 103..119
-                          Name(max) 103..106
-                          FuncCall 107..119
-                            Name(first) 107..112
+                    Assign 24..119
+                      Func 29..50
+                        Param(die) 29..32
+                        FuncCall 44..50
+                          die 44..47
+                          () 48..50
+                      Name(roll) 24..28
+                      Assign 56..119
+                        FuncCall 65..73
+                          roll 65..69
+                          die 70..73
+                        Name(first) 56..61
+                        Assign 79..119
+                          FuncCall 89..97
+                            roll 89..93
+                            die 94..97
+                          Name(second) 79..85
+                          FuncCall 103..119
+                            FuncCall 103..112
+                              max 103..106
+                              first 107..112
                             second 113..119
-                  FuncCall 122..139
-                    Name(take_highest) 122..134
+                  Name(take_highest) 0..12
+                  FuncCall 122..138
+                    take_highest 122..134
                     1d20 135..138
+            "#]],
+        );
+    }
+
+    #[test]
+    fn test_match() {
+        e(
+            indoc! {r#"
+                if first = 6 and second = 6 then "crit"
+                else first = 6 then "great"
+                else first >= 4 then "okay"
+                else "bad"
+            "#},
+            expect![[r#"
+                Match 0..107
+                  Case 0..40
+                    FuncCall 3..12
+                      FuncCall 3..10
+                        = 9..10
+                        first 3..8
+                      6 11..12
+                    "crit" 33..39
+                  Case 40..68
+                    FuncCall 45..54
+                      FuncCall 45..52
+                        = 51..52
+                        first 45..50
+                      6 53..54
+                    "great" 60..67
+                  Case 68..96
+                    FuncCall 73..83
+                      FuncCall 73..81
+                        >= 79..81
+                        first 73..78
+                      4 82..83
+                    "okay" 89..95
+                  Case 96..107
+                    true 96..107
+                    "bad" 101..106
+            "#]],
+        );
+        e(
+            indoc! {r#"if first = 6 and second = 6 then "crit""#},
+            expect![[r#"
+                Match 0..39
+                  Case 0..39
+                    FuncCall 3..12
+                      FuncCall 3..10
+                        = 9..10
+                        first 3..8
+                      6 11..12
+                    "crit" 33..39
+            "#]],
+        );
+    }
+
+    #[test]
+    fn test_blades() {
+        e(
+            include_str!("../../../examples/blades.scm"),
+            expect![[r#"
+                Assign 178..620
+                  Func 187..448
+                    Param(die) 187..190
+                    Assign 243..448
+                      FuncCall 255..266
+                        highest 255..262
+                        die 263..266
+                      Name(first) 247..252
+                      Assign 272..448
+                        FuncCall 285..294
+                          FuncCall 285..292
+                            nth 285..288
+                            die 289..292
+                          2 293..294
+                        Name(second) 276..282
+                        Match 330..448
+                          Case 330..374
+                            FuncCall 333..342
+                              FuncCall 333..340
+                                = 339..340
+                                first 333..338
+                              6 341..342
+                            "crit" 363..369
+                          Case 374..406
+                            FuncCall 379..388
+                              FuncCall 379..386
+                                = 385..386
+                                first 379..384
+                              6 387..388
+                            "great" 394..401
+                          Case 406..438
+                            FuncCall 411..421
+                              FuncCall 411..419
+                                >= 417..419
+                                first 411..416
+                              4 420..421
+                            "okay" 427..433
+                          Case 438..448
+                            true 438..448
+                            "bad" 443..448
+                  Name(blade) 181..186
+                  Assign 496..620
+                    FuncCall 504..516
+                      transpose 504..513
+                      () 514..516
+                    Name(p) 500..501
+                    For 546..620
+                      FuncCall 550..555
+                        FuncCall 550..554
+                          ..= 551..554
+                          1 550..551
+                        7 554..555
+                      Name(idx) 559..562
+                      Assign 568..620
+                        FuncCall 578..592
+                          FuncCall 578..590
+                            FuncCall 578..586
+                              blade 578..583
+                              d 585..586
+                            idx 587..590
+                          6 591..592
+                        Name(res) 572..575
+                        FuncCall 599..619
+                          FuncCall 599..609
+                            FuncCall 599..605
+                              plot 599..603
+                              p 604..605
+                            res 606..609
+                          "{idx}d6" 610..619
             "#]],
         );
     }

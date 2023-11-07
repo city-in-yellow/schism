@@ -1,0 +1,6 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(r#\"\"hi there\"\"#)"
+---
+"hi there" 0..10
+

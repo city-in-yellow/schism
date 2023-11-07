@@ -1,0 +1,6 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(\"1\")"
+---
+1 0..1
+

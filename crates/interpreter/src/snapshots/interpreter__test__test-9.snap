@@ -1,0 +1,9 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(r#\"[1, 2, 3] + 12\"#)"
+---
+List 0..14
+  13 1..2
+  14 4..5
+  15 7..8
+

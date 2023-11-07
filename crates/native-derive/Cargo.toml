@@ -1,0 +1,27 @@
+[package]
+name = "native_derive"
+version = "0.0.0"
+description = "derives natives"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "native_derive"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+# workspace deps
+
+# local deps
+quote = "*"
+syn = { version = "*", features = ["extra-traits", "full"] }
+proc-macro2 = "*"
+
+# global deps
+indoc = "2.0.4"
+prettyplease = "0.2.15"
+insta = "1.34.0"

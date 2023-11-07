@@ -1,0 +1,49 @@
+---
+source: crates/native-derive/src/native.rs
+expression: "e(indoc! {\n            r#\"\n            fn add(ctx: Context, span: Range, lhs: &TVal, rhs: &TVal) -> RFunc {\n                lhs.clone();\n                rhs.clone();\n\n                Ok(new(Val::Unit, span))\n            }\n        \"#\n        })"
+---
+fn add() -> (SmolStr, TVal) {
+    fn add(ctx: Context, span: Range, params: List<TVal, ArcK>, next: TVal) -> RFunc {
+        let span = {
+            let start = span.start.min(params.last().map(|x| x.span.start).unwrap_or(0));
+            let end = span.end.max(params.first().map(|x| x.span.end).unwrap_or(0));
+            Range { start, end }
+        };
+        let next_span = next.span;
+        let params = params.push_front(next);
+        if params.len() == 2usize {
+            let rhs: &TVal = params.first().unwrap();
+            let params = params.drop_first().unwrap();
+            let lhs: &TVal = params.first().unwrap();
+            let params = params.drop_first().unwrap();
+            let res = {
+                lhs.clone();
+                rhs.clone();
+                Ok(new(Val::Unit, span))
+            };
+            let span = Range {
+                start: span.start.min(next_span.start),
+                end: span.end.max(next_span.end),
+            };
+            res.map(|x| new(x, span))
+        } else {
+            let nfunc = NativeFunction {
+                name: "+".into(),
+                params,
+                apply: add,
+            };
+            let span = Range {
+                start: span.start.min(next_span.start),
+                end: span.end.max(next_span.end),
+            };
+            Ok(new(Val::NativeFunction(nfunc), span))
+        }
+    }
+    let nfunc = NativeFunction {
+        name: "+".into(),
+        params: List::new_sync(),
+        apply: add,
+    };
+    ("+".into(), new(Val::NativeFunction(nfunc), Range { start: 0, end: 0 }))
+}
+

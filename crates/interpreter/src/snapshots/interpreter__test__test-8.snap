@@ -1,0 +1,12 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(indoc! {\n            r#\"\n        foo bar baz is\n            barbaz is bar + baz.\n            bazbar is bar * baz.\n            bazbar - barbaz.\n        \n        foo 3 5\n    \"#\n        })"
+---
+ꡃꡨꡀꡃꡕ: kaathe.encyc.sim.lookup_err
+   ╭─[<unknown>:3:19]
+   │
+ 3 │     bazbar is bar * baz.
+   │                   ┬  
+   │                   ╰── 「unknown symbol」
+───╯
+

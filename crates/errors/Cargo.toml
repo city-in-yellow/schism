@@ -16,5 +16,6 @@ thiserror = "1.0.49"
 
 # global deps
 ariadne.workspace = true
+smol_str.workspace = true
 
 [dev-dependencies]

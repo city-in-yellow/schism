@@ -20,7 +20,11 @@ debug = 0
 [workspace.dependencies]
 ast = { path = "crates/ast" }
 errors = { path = "crates/errors" }
+interpreter = { path = "crates/interpreter" }
 parser = { path = "crates/parser" }
+native_derive = { path = "crates/native-derive" }
 
 ariadne = { version = "0.3.0", features = ["auto-color"] }
+fixed = "1.24.0"
+rpds = "1.0.1"
 smol_str = "0.2.0"

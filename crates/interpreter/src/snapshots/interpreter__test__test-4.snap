@@ -1,0 +1,6 @@
+---
+source: crates/interpreter/src/test.rs
+expression: "e(r#\"foo is 1. foo\"#)"
+---
+1 7..8
+
