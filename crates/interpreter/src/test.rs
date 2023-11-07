@@ -52,4 +52,6 @@ fn test() {
     assert_snapshot!(e(r#"1=1 or 1<=0"#));
     assert_snapshot!(e(r#"3...6"#));
     assert_snapshot!(e(r#"3..=6"#));
+    assert_snapshot!(e(r#"for 1..=10 as idx do idx * 2"#));
+    assert_snapshot!(e(r#"for 1..=3 as x do for 1..=3 as y do [x, y]"#));
 }

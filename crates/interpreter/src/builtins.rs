@@ -584,7 +584,7 @@ fn inc_range(ctx: Context, span: Range, l: &TVal, r: &TVal) -> RFunc {
     }
 }
 
-pub fn background_ctx() -> Context {
+pub fn background_ctx() -> Context<'static> {
     let mut ctx = Context::new();
 
     for func in [
@@ -593,7 +593,7 @@ pub fn background_ctx() -> Context {
         ex_range, inc_range, // ranges
     ] {
         let (name, f) = func();
-        ctx = ctx.with(name, f)
+        ctx = ctx.with_builtin(name, f)
     }
 
     ctx

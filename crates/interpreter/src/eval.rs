@@ -5,6 +5,7 @@ use ast::{
 };
 use errors::{ForError, FuncError, InterpretingError, LookupError, MatchError};
 use rayon::prelude::*;
+use rpds::HashTrieMap;
 use smol_str::SmolStr;
 
 type Res = Result<TVal, InterpretingError>;
@@ -64,12 +65,22 @@ fn eval_atom(ctx: Context, atom: Trivia<Atom>) -> Res {
 }
 
 fn eval_function_body(ctx: Context, ident: Trivia<SmolStr>, expr: TExpr, span: Range) -> Res {
-    Ok(new(Val::Function(ctx, ident, expr), span))
+    let closure = {
+        let mut c = HashTrieMap::new_sync();
+
+        for (key, value) in ctx.environment.iter() {
+            c = c.insert((*key).clone(), (*value).clone());
+        }
+
+        c
+    };
+
+    Ok(new(Val::Function(closure, ident, expr), span))
 }
 
 fn eval_assignment(ctx: Context, expr: TExpr, ident: Trivia<SmolStr>, next: TExpr) -> Res {
     let arg = eval(ctx.clone(), expr)?;
-    let func_ctx = ctx.with(ident.inner, arg);
+    let func_ctx = ctx.with(&ident.inner, &arg);
     eval(func_ctx, next)
 }
 
@@ -121,7 +132,7 @@ fn eval_for_range(
 
     let mapped_items = items
         .into_par_iter()
-        .map(|item| eval(ctx.with(ident.inner.clone(), item), expr.clone()))
+        .map(|item| eval(ctx.with(&ident.inner, &item), expr.clone()))
         .collect::<Result<_, InterpretingError>>()?;
 
     Ok(new(Val::List(mapped_items), outer_span))
@@ -135,8 +146,8 @@ fn eval_function_call(ctx: Context, func: TExpr, arg: TExpr) -> Res {
             ..
         } => {
             let func_ctx = ctx.merge(&func_ctx);
-            let arg = eval(ctx, arg)?;
-            let func_ctx = func_ctx.with(ident.inner, arg);
+            let arg = eval(ctx.clone(), arg)?;
+            let func_ctx = func_ctx.with(&ident.inner, &arg);
             eval(func_ctx, body)
         }
         Trivia {

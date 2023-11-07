@@ -10,12 +10,12 @@ use crate::{
 };
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Context {
+pub struct Context<'w> {
     pub builtins: HashTrieMap<SmolStr, TVal, ArcK>,
-    pub environment: HashTrieMap<SmolStr, TVal, ArcK>,
+    pub environment: HashTrieMap<&'w SmolStr, &'w TVal, ArcK>,
 }
 
-impl Context {
+impl<'w> Context<'w> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -24,27 +24,34 @@ impl Context {
         }
     }
 
-    pub fn with(&self, key: SmolStr, val: TVal) -> Self {
+    pub fn with_builtin(&self, key: SmolStr, val: TVal) -> Self {
+        Self {
+            builtins: self.builtins.insert(key, val),
+            environment: self.environment.clone(),
+        }
+    }
+
+    pub fn with<'c: 'w>(&'c self, key: &'w SmolStr, val: &'w TVal) -> Self {
         Self {
             builtins: self.builtins.clone(),
             environment: self.environment.insert(key, val),
         }
     }
 
-    pub fn find(&self, key: &SmolStr) -> Option<&TVal> {
-        self.builtins.get(key).or_else(|| self.environment.get(key))
+    pub fn find(&'w self, key: &'w SmolStr) -> Option<&'w TVal> {
+        self.builtins
+            .get(key)
+            .or_else(|| self.environment.get(key).copied())
     }
 
-    pub fn merge(&self, other: &Self) -> Self {
-        let mut next_environment: HashTrieMap<SmolStr, Trivia<Val>, ArcK> =
-            other.environment.clone();
-        for key in self.environment.keys() {
-            if next_environment.contains_key(key) {
+    pub fn merge<'a: 'w>(&'a self, other: &'a HashTrieMap<SmolStr, TVal, ArcK>) -> Self {
+        let mut next_environment = self.environment.clone();
+        for (key, value) in other.iter() {
+            if next_environment.contains_key(&key) {
                 continue;
             }
 
-            next_environment =
-                next_environment.insert(key.clone(), self.environment.get(key).unwrap().clone());
+            next_environment = next_environment.insert(key, value);
         }
 
         Self {
@@ -54,7 +61,7 @@ impl Context {
     }
 }
 
-impl Clone for Context {
+impl<'w> Clone for Context<'w> {
     fn clone(&self) -> Self {
         Self {
             builtins: self.builtins.clone(),
@@ -81,7 +88,7 @@ pub enum Val {
     Number(isize),
     Decimal(Float),
     List(Vec<TVal>),
-    Function(Context, Trivia<SmolStr>, TExpr),
+    Function(HashTrieMap<SmolStr, TVal, ArcK>, Trivia<SmolStr>, TExpr),
     NativeFunction(NativeFunction),
 }
 
