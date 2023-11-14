@@ -1,8 +1,8 @@
-use archery::ArcK;
 use errors::InterpretingError;
-use rpds::{HashTrieMap, List};
+use rpds::{HashTrieMapSync, ListSync};
 use rug::Float;
 use smol_str::SmolStr;
+use std::{cmp::Ordering, hash::Hash, mem};
 
 use crate::{
     ast::{tagged_pretty_string, TExpr},
@@ -11,16 +11,16 @@ use crate::{
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Context<'w> {
-    pub builtins: HashTrieMap<SmolStr, TVal, ArcK>,
-    pub environment: HashTrieMap<&'w SmolStr, &'w TVal, ArcK>,
+    pub builtins: HashTrieMapSync<SmolStr, TVal>,
+    pub environment: HashTrieMapSync<&'w SmolStr, &'w TVal>,
 }
 
 impl<'w> Context<'w> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            builtins: HashTrieMap::new_sync(),
-            environment: HashTrieMap::new_sync(),
+            builtins: HashTrieMapSync::new_sync(),
+            environment: HashTrieMapSync::new_sync(),
         }
     }
 
@@ -44,7 +44,7 @@ impl<'w> Context<'w> {
             .or_else(|| self.environment.get(key).copied())
     }
 
-    pub fn merge<'a: 'w>(&'a self, other: &'a HashTrieMap<SmolStr, TVal, ArcK>) -> Self {
+    pub fn merge<'a: 'w>(&'a self, other: &'a HashTrieMapSync<SmolStr, TVal>) -> Self {
         let mut next_environment = self.environment.clone();
         for (key, value) in other.iter() {
             if next_environment.contains_key(&key) {
@@ -76,8 +76,8 @@ pub type RFunc = Result<TVal, InterpretingError>;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeFunction {
     pub name: SmolStr,
-    pub params: List<TVal, ArcK>,
-    pub apply: fn(Context, Range, List<TVal, ArcK>, TVal) -> RFunc,
+    pub params: ListSync<TVal>,
+    pub apply: fn(Context, Range, ListSync<TVal>, TVal) -> RFunc,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -88,11 +88,46 @@ pub enum Val {
     Number(isize),
     Decimal(Float),
     List(Vec<TVal>),
-    Function(HashTrieMap<SmolStr, TVal, ArcK>, Trivia<SmolStr>, TExpr),
+    Function(HashTrieMapSync<SmolStr, TVal>, Trivia<SmolStr>, TExpr),
     NativeFunction(NativeFunction),
 }
 
 impl Eq for Val {}
+impl Hash for Val {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Val::Unit => mem::discriminant(self).hash(state),
+            Val::Bool(b) => b.hash(state),
+            Val::String(s) => s.hash(state),
+            Val::Number(n) => n.hash(state),
+            Val::Decimal(d) => d.to_string().hash(state),
+            Val::List(l) => l.hash(state),
+            Val::Function(_, i, _) => i.hash(state),
+            Val::NativeFunction(NativeFunction { name: i, .. }) => i.hash(state),
+        };
+    }
+}
+
+impl PartialOrd for Val {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let l_d = mem::discriminant(self);
+        let r_d = mem::discriminant(other);
+
+        if l_d != r_d {
+            return None;
+        }
+
+        match (self, other) {
+            (Val::List(_) | Val::Function(..) | Val::NativeFunction(_), _) => None,
+            (Val::Unit, _) => Some(Ordering::Equal),
+            (Val::Bool(l), Val::Bool(r)) => l.partial_cmp(r),
+            (Val::String(l), Val::String(r)) => l.partial_cmp(r),
+            (Val::Number(l), Val::Number(r)) => l.partial_cmp(r),
+            (Val::Decimal(l), Val::Decimal(r)) => l.partial_cmp(r),
+            _ => unreachable!(),
+        }
+    }
+}
 
 impl Val {
     pub fn to_readable_type(&self) -> SmolStr {
@@ -107,6 +142,13 @@ impl Val {
             Val::NativeFunction(_) => "Builtin",
         }
         .into()
+    }
+
+    pub fn as_num(&self) -> isize {
+        match self {
+            Val::Number(i) => *i,
+            x => panic!("not a number! {:?}", x),
+        }
     }
 }
 
