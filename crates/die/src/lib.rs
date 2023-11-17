@@ -2,14 +2,13 @@
 
 use ast::hir::Val;
 use cached::{proc_macro::cached, Return};
-use fxhash::{FxBuildHasher, FxHashMap, FxHasher};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use rug::{Assign, Integer, Rational};
+use rustc_hash::{FxHashMap, FxHasher};
 use smol_str::SmolStr;
 use std::{
     cmp::Ordering,
-    collections::HashMap,
     hash::{Hash, Hasher},
     sync::{Arc, Mutex},
 };
@@ -46,7 +45,7 @@ impl<'a> PqRef<'a> {
 
 #[derive(Clone, Debug)]
 pub struct State {
-    pub m: HashMap<Val, Integer, FxBuildHasher>,
+    pub m: FxHashMap<Val, Integer>,
 }
 
 impl Default for State {
