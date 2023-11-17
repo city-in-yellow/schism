@@ -14,7 +14,7 @@ use std::{
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct Pq {
-    pub queue: Vec<(Val, u32)>,
+    pub queue: Vec<Arc<(Val, u32)>>,
 }
 
 impl Pq {
@@ -25,17 +25,16 @@ impl Pq {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct PqRef<'a> {
-    pub queue: &'a [(Val, u32)],
+    pub queue: &'a [Arc<(Val, u32)>],
 }
 
 impl<'a> PqRef<'a> {
-    fn pop(self) -> (&'a Val, u32, Self) {
+    fn pop(self) -> (Arc<(Val, u32)>, Self) {
         assert!(!self.queue.is_empty());
 
-        let (val, prob) = &self.queue[0];
+        let v = &self.queue[0];
         (
-            val,
-            *prob,
+            v.clone(),
             Self {
                 queue: &self.queue[1..],
             },
@@ -45,9 +44,8 @@ impl<'a> PqRef<'a> {
 
 impl<'a> Hash for PqRef<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for (k, v) in self.queue {
-            k.hash(state);
-            v.hash(state);
+        for a in self.queue {
+            a.hash(state);
         }
     }
 }
@@ -88,7 +86,7 @@ impl State {
 fn pq_from_base(base: u32) -> Pq {
     Pq {
         queue: (1..=base)
-            .map(|x| (Val::Number(x as isize), 1))
+            .map(|x| Arc::new((Val::Number(x as isize), 1)))
             .rev()
             .collect(),
     }
@@ -113,12 +111,14 @@ fn hash_solve(pq: &PqRef, n: u32) -> u64 {
     convert = r#"{hash_solve(&pq, n)}"#,
     with_cached_flag = true
 )]
-fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<State> {
-    let (outcome, prob, pq) = pq.pop();
+fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<State>> {
+    let (a, pq) = pq.pop();
+    let outcome = &a.0;
+    let prob = a.1;
 
     if pq.queue.is_empty() {
         let state = next(&Val::Unit, outcome, &Val::Number(n.try_into().unwrap()));
-        return Return::new(State::singleton(state, 1.into()));
+        return Return::new(Arc::new(State::singleton(state, 1.into())));
     };
 
     let mut result = State::new();
@@ -129,14 +129,14 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<State> 
             tail.value
         };
 
-        for (state, weight) in tail.m {
-            let state = next(&state, outcome, &Val::Number(k.try_into().unwrap()));
-            let next_weight = weight * binomial(n, k).to_u128_wrapping() * prob as u128;
+        for (state, weight) in &tail.m {
+            let state = next(state, outcome, &Val::Number(k.try_into().unwrap()));
+            let next_weight = weight * binomial(n, k) * prob as u128;
             result.insert(state, next_weight);
         }
     }
 
-    Return::new(result)
+    Return::new(Arc::new(result))
 }
 
 #[cached(key = "u64", convert = r#"{hash_solve(&pq, n)}"#)]
@@ -150,6 +150,7 @@ fn solve_and_finalize(
     let res = solve(pq, n, next)
         .value
         .m
+        .clone()
         .into_par_iter()
         .map(|(k, v)| {
             {
