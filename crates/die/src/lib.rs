@@ -1,3 +1,5 @@
+#![feature(hash_raw_entry)]
+
 use ast::hir::Val;
 use cached::{proc_macro::cached, Return};
 use fxhash::{FxBuildHasher, FxHashMap, FxHasher};
@@ -75,10 +77,12 @@ impl State {
     }
 
     pub fn insert(&mut self, k: Val, v: Integer) {
-        match self.m.remove(&k) {
-            None => self.m.insert(k, v),
-            Some(vv) => self.m.insert(k, v + vv),
-        };
+        *self
+            .m
+            .raw_entry_mut()
+            .from_key(&k)
+            .or_insert(k, Integer::ZERO)
+            .1 += v;
     }
 }
 
