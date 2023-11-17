@@ -269,7 +269,10 @@ dependencies = [
  "ast",
  "cached",
  "fxhash",
+ "indoc",
+ "insta",
  "lazy_static",
+ "multimap",
  "num",
  "rayon",
  "rpds",
@@ -507,6 +510,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "multimap"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1a5d38b9b352dbd913288736af36af41c48d61b1a8cd34bcecd727561b7d511"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

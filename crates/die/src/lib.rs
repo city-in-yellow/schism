@@ -1,166 +1,161 @@
-#![feature(step_trait)]
-
 use ast::hir::Val;
-use cached::proc_macro::cached;
-use fxhash::FxHasher;
+use cached::{proc_macro::cached, Return};
+use fxhash::{FxBuildHasher, FxHashMap, FxHasher};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
-use rpds::{HashTrieMapSync, QueueSync};
-use rug::{Complete, Integer, Rational};
+use rug::{Integer, Rational};
 use smol_str::SmolStr;
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     hash::{Hash, Hasher},
-    iter::Step,
-    ops::Range,
     sync::{Arc, Mutex},
 };
 
-type ProbQueue = QueueSync<(Val, Rational)>;
-type ProbMap = HashTrieMapSync<Val, Rational>;
-
-fn hash_binomial(n: &Integer, k: &Integer) -> u64 {
-    let mut state = FxHasher::default();
-
-    n.hash(&mut state);
-    k.hash(&mut state);
-
-    state.finish()
+#[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
+pub struct Pq {
+    pub queue: Vec<(Val, u32)>,
 }
 
-#[cached(key = "u64", convert = r#"{hash_binomial(&n, k)}"#)]
-fn binomial(n: &Integer, k: &Integer) -> Integer {
-    n.clone().binomial(k.to_u32_wrapping())
+impl Pq {
+    fn as_ref(&self) -> PqRef {
+        PqRef { queue: &self.queue }
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
+pub struct PqRef<'a> {
+    pub queue: &'a [(Val, u32)],
+}
+
+impl<'a> PqRef<'a> {
+    fn pop(self) -> (&'a Val, u32, Self) {
+        assert!(!self.queue.is_empty());
+
+        let (val, prob) = &self.queue[0];
+        (
+            val,
+            *prob,
+            Self {
+                queue: &self.queue[1..],
+            },
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct State {
+    pub m: HashMap<Val, Integer, FxBuildHasher>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl State {
+    fn new() -> Self {
+        Self {
+            m: FxHashMap::default(),
+        }
+    }
+
+    pub fn singleton(k: Val, v: Integer) -> Self {
+        let mut s = Self::new();
+        s.insert(k, v);
+        s
+    }
+
+    pub fn insert(&mut self, k: Val, v: Integer) {
+        match self.m.remove(&k) {
+            None => self.m.insert(k, v),
+            Some(vv) => self.m.insert(k, v + vv),
+        };
+    }
 }
 
 #[cached]
-fn prob_queue_from_base(base: u32) -> ProbQueue {
-    (1..=base)
-        .map(|x| (Val::Number(x as isize), Rational::from((x, base))))
-        .rev()
-        .collect()
+fn pq_from_base(base: u32) -> Pq {
+    Pq {
+        queue: (1..=base)
+            .map(|x| (Val::Number(x as isize), 1))
+            .rev()
+            .collect(),
+    }
 }
 
-fn pop_pq(pq: ProbQueue) -> (Val, ProbQueue) {
-    assert!(!pq.is_empty());
-
-    let (val, _) = pq.peek().unwrap().to_owned();
-    let next = pq.dequeue().unwrap();
-    (val, next)
+#[cached]
+fn binomial(n: u32, k: u32) -> Integer {
+    Integer::from(n).binomial(k)
 }
 
-fn hash_solve(pq: &ProbQueue, n: &Integer) -> u64 {
+fn hash_solve(pq: &PqRef, n: u32) -> u64 {
     let mut state = FxHasher::default();
 
-    for (k, v) in pq.iter() {
-        k.hash(&mut state);
-        v.hash(&mut state)
-    }
-
+    pq.hash(&mut state);
     n.hash(&mut state);
 
     state.finish()
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct IntegerWrapper(Integer);
+#[cached(
+    key = "u64",
+    convert = r#"{hash_solve(&pq, n)}"#,
+    with_cached_flag = true
+)]
+fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<State> {
+    let (outcome, prob, pq) = pq.pop();
 
-impl IntegerWrapper {
-    fn r_inc(lhs: &Integer, rhs: &Integer) -> Range<IntegerWrapper> {
-        Range {
-            start: IntegerWrapper(lhs.clone()),
-            end: IntegerWrapper(rhs.clone() + 1),
-        }
-    }
-}
-
-impl Step for IntegerWrapper {
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        (&end.0 - &start.0).complete().to_usize()
-    }
-
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(IntegerWrapper(start.0 + count))
-    }
-
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(IntegerWrapper(start.0 - count))
-    }
-}
-
-#[cached(key = "u64", convert = r#"{hash_solve(&pq, n)}"#)]
-fn solve(
-    pq: ProbQueue,
-    n: &Integer,
-    pm: &ProbMap,
-    next: fn(&Val, &Val, &Val) -> Val,
-) -> HashTrieMapSync<Val, Rational> {
-    let (outcome, pq) = pop_pq(pq);
-
-    if pq.is_empty() {
-        let state = next(&Val::Unit, &outcome, &Val::Number(n.to_isize_wrapping()));
-        return HashTrieMapSync::new_sync().insert(state, 1.into());
+    if pq.queue.is_empty() {
+        let state = next(&Val::Unit, outcome, &Val::Number(n.try_into().unwrap()));
+        return Return::new(State::singleton(state, 1.into()));
     };
 
-    let mut result: HashTrieMapSync<Val, Rational> = HashTrieMapSync::new_sync();
-    for k in IntegerWrapper::r_inc(&Integer::ZERO, n) {
-        let k = k.0;
+    let mut result = State::new();
+    (0..=n).for_each(|k| {
+        let tail = solve(pq.clone(), n - k, next);
+        let tail = {
+            // println!("cached: {}", tail.was_cached);
+            tail.value
+        };
 
-        let tail = solve(pq.clone(), &(n - &k).complete(), pm, next);
-        for (state, weight) in tail.into_iter() {
-            let state = next(state, &outcome, &Val::Number(k.to_isize_wrapping()));
-            let weight = (weight * binomial(n, &k)).complete() * 1;
+        tail.m.into_iter().for_each(|(state, weight)| {
+            let state = next(&state, outcome, &Val::Number(k.try_into().unwrap()));
+            let next_weight = weight * binomial(n, k).to_u128_wrapping() * prob as u128;
+            result.insert(state, next_weight);
+        });
+    });
 
-            result = match result.get(&state) {
-                None => result.insert(state, weight),
-                Some(o) => result.insert(state, o + weight),
-            }
-        }
-    }
-
-    result
+    Return::new(result)
 }
 
 #[cached(key = "u64", convert = r#"{hash_solve(&pq, n)}"#)]
 fn solve_and_finalize(
-    pq: ProbQueue,
-    n: &Integer,
+    pq: PqRef,
+    n: u32,
     next: fn(&Val, &Val, &Val) -> Val,
-) -> std::vec::Vec<(Val, f64)> {
+) -> std::vec::Vec<(Val, Rational)> {
     let total = Arc::new(Mutex::new(Rational::ZERO.clone()));
 
-    let pm = {
-        let mut pm = HashTrieMapSync::new_sync();
-
-        let mut total = Rational::ZERO.clone();
-        for (_, p) in pq.iter() {
-            total += p;
-        }
-
-        for (v, p) in pq.iter() {
-            pm = pm.insert(v.clone(), p / total.clone());
-        }
-
-        pm
-    };
-
-    let res = solve(pq, n, &pm, next)
-        .into_iter()
-        .par_bridge()
+    let res = solve(pq, n, next)
+        .value
+        .m
+        .into_par_iter()
         .map(|(k, v)| {
             {
                 let mut total = total.lock().unwrap();
-                *total += v;
+                *total += &v;
             }
 
-            (k.clone(), v.clone())
+            (k, v)
         })
         .collect::<Vec<_>>();
 
     let total = { total.lock().unwrap().clone() };
     let mut res = res
         .into_par_iter()
-        .map(|(k, v)| (k, (v / total.clone()).to_f64() * 100.))
+        .map(|(k, v)| (k, (v / total.clone())))
         .collect::<Vec<_>>();
     res.sort_unstable_by(|(l, _), (r, _)| match l.partial_cmp(r) {
         None => Ordering::Equal,
@@ -171,15 +166,16 @@ fn solve_and_finalize(
 }
 
 lazy_static! {
-    static ref D2_PROB_QUEUE: ProbQueue = BasicDie::D2.gen_prob_queue();
-    static ref D4_PROB_QUEUE: ProbQueue = BasicDie::D4.gen_prob_queue();
-    static ref D6_PROB_QUEUE: ProbQueue = BasicDie::D6.gen_prob_queue();
-    static ref D8_PROB_QUEUE: ProbQueue = BasicDie::D8.gen_prob_queue();
-    static ref D10_PROB_QUEUE: ProbQueue = BasicDie::D10.gen_prob_queue();
-    static ref D12_PROB_QUEUE: ProbQueue = BasicDie::D12.gen_prob_queue();
-    static ref D20_PROB_QUEUE: ProbQueue = BasicDie::D20.gen_prob_queue();
+    static ref D2_PROB_QUEUE: Pq = BasicDie::D2.gen_prob_queue();
+    static ref D4_PROB_QUEUE: Pq = BasicDie::D4.gen_prob_queue();
+    static ref D6_PROB_QUEUE: Pq = BasicDie::D6.gen_prob_queue();
+    static ref D8_PROB_QUEUE: Pq = BasicDie::D8.gen_prob_queue();
+    static ref D10_PROB_QUEUE: Pq = BasicDie::D10.gen_prob_queue();
+    static ref D12_PROB_QUEUE: Pq = BasicDie::D12.gen_prob_queue();
+    static ref D20_PROB_QUEUE: Pq = BasicDie::D20.gen_prob_queue();
 }
 
+#[derive(Clone, Debug)]
 pub enum BasicDie {
     D2,
     D4,
@@ -203,11 +199,11 @@ impl BasicDie {
         }
     }
 
-    pub(crate) fn gen_prob_queue(&self) -> ProbQueue {
-        prob_queue_from_base(self.base())
+    pub(crate) fn gen_prob_queue(&self) -> Pq {
+        pq_from_base(self.base())
     }
 
-    pub fn prob_queue(&self) -> ProbQueue {
+    pub fn prob_queue(&self) -> Pq {
         match self {
             BasicDie::D2 => D2_PROB_QUEUE.to_owned(),
             BasicDie::D4 => D4_PROB_QUEUE.to_owned(),
@@ -220,22 +216,23 @@ impl BasicDie {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum Die {
     Basic {
-        count: Integer,
+        count: u32,
         kind: BasicDie,
         repr: Option<SmolStr>,
     },
     Custom {
-        count: Integer,
-        prob_queue: ProbQueue,
+        count: u32,
+        prob_queue: Pq,
         repr: SmolStr,
     },
 }
 
 impl Die {
     pub fn of_base(base: u32) -> Die {
-        let count = Integer::ONE.clone();
+        let count = 1;
         match base {
             2 => Die::Basic {
                 count,
@@ -274,14 +271,13 @@ impl Die {
             },
             _ => Die::Custom {
                 count,
-                prob_queue: prob_queue_from_base(base),
+                prob_queue: pq_from_base(base),
                 repr: format!("d{base}").into(),
             },
         }
     }
 
     pub fn of_count_base(count: u32, base: u32) -> Die {
-        let count = Integer::from(count);
         match base {
             2 => Die::Basic {
                 count,
@@ -320,35 +316,40 @@ impl Die {
             },
             _ => Die::Custom {
                 count,
-                prob_queue: prob_queue_from_base(base),
+                prob_queue: pq_from_base(base),
                 repr: format!("d{base}").into(),
             },
         }
     }
 
-    pub fn count(&self) -> Integer {
+    pub fn count(&self) -> u32 {
         match self {
-            Die::Basic { count, .. } | Die::Custom { count, .. } => count.clone(),
+            Die::Basic { count, .. } | Die::Custom { count, .. } => *count,
         }
     }
 
-    pub fn prob_queue(&self) -> ProbQueue {
+    pub fn prob_queue(&self) -> Pq {
         match self {
             Die::Basic { kind, .. } => kind.prob_queue(),
             Die::Custom { prob_queue, .. } => prob_queue.clone(),
         }
     }
 
-    pub fn solve(&self, next: fn(&Val, &Val, &Val) -> Val) -> Vec<(Val, f64)> {
-        solve_and_finalize(self.prob_queue(), &self.count(), next)
+    pub fn solve(&self, next: fn(&Val, &Val, &Val) -> Val) -> Vec<(Val, Rational)> {
+        solve_and_finalize(self.prob_queue().as_ref(), self.count(), next)
     }
 }
 
 #[cfg(test)]
 mod test {
     use ast::hir::Val;
+    use insta::assert_snapshot;
 
     use crate::Die;
+
+    fn e(d: Die, next: fn(&Val, &Val, &Val) -> Val) -> String {
+        format!("{:#?}\n", d.solve(next))
+    }
 
     fn next_state(state: &Val, outcome: &Val, count: &Val) -> Val {
         match state {
@@ -359,35 +360,11 @@ mod test {
 
     #[test]
     fn test() {
-        let die = Die::of_count_base(150, 20);
+        // println!("{:?}", Die::of_count_base(150, 20).prob_queue());
+        // assert_snapshot!(e(Die::of_count_base(8, 4), next_state));
+        // assert_snapshot!(e(Die::of_count_base(80, 4), next_state));
+        // assert_snapshot!(e(Die::of_count_base(150, 20), next_state));
 
-        assert_eq!("", format!("{:?}", die.solve(next_state)))
+        Die::of_count_base(150, 20).solve(next_state);
     }
 }
-
-/*
-
- * d20 + 17
- * d10 + 11 + 2d6 + 4 + 1d6 + 10
- * 1d4 + 11 + 2d6 + 4
-
- * d20 + 17 - 5
- * d20 + 9 + 4 + 1d6 + 10 + 10
-
- * (2 * (4d10 + 2d6 + 1d6)) + 11 + 4 + 10
-
- * 184
- * 176
- * 170
- * 157
- * 148
- * 127
- * 115
- * 105
- * 92
- * 63
- * 39
- * 33
- * 
-
- */
