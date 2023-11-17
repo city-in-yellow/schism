@@ -23,7 +23,7 @@ impl Pq {
     }
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct PqRef<'a> {
     pub queue: &'a [(Val, u32)],
 }
@@ -40,6 +40,15 @@ impl<'a> PqRef<'a> {
                 queue: &self.queue[1..],
             },
         )
+    }
+}
+
+impl<'a> Hash for PqRef<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for (k, v) in self.queue {
+            k.hash(state);
+            v.hash(state);
+        }
     }
 }
 
@@ -113,19 +122,19 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<State> 
     };
 
     let mut result = State::new();
-    (0..=n).for_each(|k| {
+    for k in 0..n {
         let tail = solve(pq.clone(), n - k, next);
         let tail = {
             // println!("cached: {}", tail.was_cached);
             tail.value
         };
 
-        tail.m.into_iter().for_each(|(state, weight)| {
+        for (state, weight) in tail.m {
             let state = next(&state, outcome, &Val::Number(k.try_into().unwrap()));
             let next_weight = weight * binomial(n, k).to_u128_wrapping() * prob as u128;
             result.insert(state, next_weight);
-        });
-    });
+        }
+    }
 
     Return::new(result)
 }
