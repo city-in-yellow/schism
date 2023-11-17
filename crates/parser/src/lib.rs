@@ -204,6 +204,55 @@ mod test {
     }
 
     #[test]
+    fn test_struct() {
+        e(
+            "{ a: 1 }",
+            expect![[r#"
+                Struct 0..8
+                  Entry 2..6
+                    Key(a) 2..3
+                    1 5..6
+            "#]],
+        );
+        e(
+            r#"{ a: 1, b: "test" }"#,
+            expect![[r#"
+                Struct 0..19
+                  Entry 2..6
+                    Key(a) 2..3
+                    1 5..6
+                  Entry 8..17
+                    Key(b) 8..9
+                    "test" 11..17
+            "#]],
+        );
+        e(
+            "{ a: 1, foo: [1,2,4], bar: { x: d20, y: fourteen } }",
+            expect![[r#"
+                Struct 0..52
+                  Entry 2..6
+                    Key(a) 2..3
+                    1 5..6
+                  Entry 22..50
+                    Key(bar) 22..25
+                    Struct 27..50
+                      Entry 29..35
+                        Key(x) 29..30
+                        1d20 32..35
+                      Entry 37..48
+                        Key(y) 37..38
+                        fourteen 40..48
+                  Entry 8..20
+                    Key(foo) 8..11
+                    List 13..20
+                      1 14..15
+                      2 16..17
+                      4 18..19
+            "#]],
+        );
+    }
+
+    #[test]
     fn test_expr() {
         e(
             "1",

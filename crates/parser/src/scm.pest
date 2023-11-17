@@ -12,6 +12,9 @@ empty_list = _{ "[" ~ "]" }
 poplated_list = _{ "[" ~ group ~ ("," ~ group)* ~ ","? ~ "]" }
 list = { empty_list | poplated_list }
 
+struct_entry = { ident ~ ":" ~ group }
+struct_body = { "{" ~ struct_entry ~ ("," ~ struct_entry)* ~ ","? ~ "}" }
+
 group   =  { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
 infix   =  { "+" | "-" | "*" | "/" | "=" | "^" | "and" | "or" | ">=" | ">" | "<=" | "<" | "..." | "..=" }
 prefix  =  { "!" }
@@ -22,6 +25,7 @@ primary = _{
     | assignment 
     | if_expr
     | unit
+    | struct_body
     | "(" ~ group ~ ")" 
     | list 
     | die 

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use smol_str::SmolStr;
 
 use crate::trivia::{Trivia, WithTrivia};
@@ -11,6 +13,7 @@ pub enum Atom {
     Number(isize),
     Die(usize, usize),
     List(Vec<TExpr>),
+    Struct(BTreeMap<Trivia<SmolStr>, TExpr>),
 }
 
 impl WithTrivia for Trivia<Atom> {
@@ -35,6 +38,28 @@ impl WithTrivia for Trivia<Atom> {
                 let line = format!("{buffer}List {}..{}", self.span.start, self.span.end);
                 let mut lines: Vec<String> =
                     list.iter().map(|x| x.pretty_string(indent + 2)).collect();
+                lines.insert(0, line);
+
+                lines.join("\n")
+            }
+            Atom::Struct(map) => {
+                let line = format!("{buffer}Struct {}..{}", self.span.start, self.span.end);
+                let mut lines: Vec<String> = map
+                    .iter()
+                    .flat_map(|(k, v)| {
+                        [
+                            format!("{buffer}  Entry {}..{}", k.span.start, v.span.end),
+                            tagged_pretty_string(
+                                &k.inner,
+                                "Key",
+                                k.span.start,
+                                k.span.end,
+                                indent + 4,
+                            ),
+                            v.pretty_string(indent + 4),
+                        ]
+                    })
+                    .collect();
                 lines.insert(0, line);
 
                 lines.join("\n")

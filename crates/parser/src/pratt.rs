@@ -86,6 +86,24 @@ impl ExprParser {
         newb(list, span)
     }
 
+    fn struct_entry(&mut self, pair: Pair<'_, Rule>) -> (Trivia<SmolStr>, TExpr) {
+        let span = self.span(&pair);
+        let mut pairs = pair.into_inner();
+
+        let ident = self.smol_str(pairs.next().unwrap());
+        let val = self.expr(pairs.next().unwrap());
+
+        (ident, val)
+    }
+
+    fn struct_body(&mut self, pair: Pair<'_, Rule>) -> TExpr {
+        let span = self.span(&pair);
+        let atom = Atom::Struct(pair.into_inner().map(|x| self.struct_entry(x)).collect());
+        let map = Expr::Atom(new(atom, span));
+
+        newb(map, span)
+    }
+
     fn expr(&mut self, pair: Pair<'_, Rule>) -> TExpr {
         self.parse(&mut pair.into_inner()).unwrap()
     }
@@ -298,6 +316,7 @@ where
                 | Rule::list
                 | Rule::empty_list
                 | Rule::poplated_list
+                | Rule::struct_body
                 | Rule::die
                 | Rule::number
                 | Rule::string
@@ -320,6 +339,7 @@ where
             Rule::number => self.number(tree),
             Rule::die => self.die(tree),
             Rule::list => self.list(tree),
+            Rule::struct_body => self.struct_body(tree),
             Rule::group => self.expr(tree),
             Rule::assignment => self.assignment(tree),
             Rule::if_expr => self.match_expr(tree),

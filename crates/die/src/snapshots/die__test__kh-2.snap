@@ -1,128 +1,103 @@
 ---
 source: crates/die/src/lib.rs
-assertion_line: 387
-expression: "e(Die::of_count_base(1, 20), next_state)"
+expression: "ec(Die::of_count_base(4, 6), \"prob\", next_state,\n    CountList { queue: &[Keep::Keep, Keep::Keep, Keep::Keep, Keep::Ignore] })"
 ---
 [
     (
         Number(
-            1,
-        ),
-        1/20,
-    ),
-    (
-        Number(
-            2,
-        ),
-        1/20,
-    ),
-    (
-        Number(
-            3,
-        ),
-        1/20,
-    ),
-    (
-        Number(
             4,
         ),
-        1/20,
+        1/1296,
     ),
     (
         Number(
             5,
         ),
-        1/20,
+        1/324,
     ),
     (
         Number(
             6,
         ),
-        1/20,
+        11/1296,
     ),
     (
         Number(
             7,
         ),
-        1/20,
+        1/54,
     ),
     (
         Number(
             8,
         ),
-        1/20,
+        11/324,
     ),
     (
         Number(
             9,
         ),
-        1/20,
+        73/1296,
     ),
     (
         Number(
             10,
         ),
-        1/20,
+        1/12,
     ),
     (
         Number(
             11,
         ),
-        1/20,
+        71/648,
     ),
     (
         Number(
             12,
         ),
-        1/20,
+        169/1296,
     ),
     (
         Number(
             13,
         ),
-        1/20,
+        91/648,
     ),
     (
         Number(
             14,
         ),
-        1/20,
+        89/648,
     ),
     (
         Number(
             15,
         ),
-        1/20,
+        151/1296,
     ),
     (
         Number(
             16,
         ),
-        1/20,
+        55/648,
     ),
     (
         Number(
             17,
         ),
-        1/20,
+        11/216,
     ),
     (
         Number(
             18,
         ),
-        1/20,
+        29/1296,
     ),
     (
         Number(
             19,
         ),
-        1/20,
-    ),
-    (
-        Number(
-            20,
-        ),
-        1/20,
+        1/324,
     ),
 ]
 

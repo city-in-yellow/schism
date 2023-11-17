@@ -38,6 +38,14 @@ fn eval_atom(ctx: Context, atom: Trivia<Atom>) -> Res {
                 .collect::<Result<_, InterpretingError>>()?;
             new(Val::List(list), atom.span)
         }
+        Atom::Struct(map) => {
+            let map = map
+                .into_par_iter()
+                .map(|(k, v)| Ok((k, eval(ctx.clone(), v)?)))
+                .collect::<Result<_, InterpretingError>>()?;
+
+            new(Val::Struct(map), atom.span)
+        }
         Atom::Ident(ident) => match ctx.find(&ident) {
             Some(val) => match val {
                 Trivia {

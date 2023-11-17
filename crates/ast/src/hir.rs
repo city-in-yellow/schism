@@ -2,7 +2,7 @@ use errors::InterpretingError;
 use rpds::{HashTrieMapSync, ListSync};
 use rug::Float;
 use smol_str::SmolStr;
-use std::{cmp::Ordering, hash::Hash, mem};
+use std::{cmp::Ordering, collections::BTreeMap, hash::Hash, mem};
 
 use crate::{
     ast::{tagged_pretty_string, TExpr},
@@ -88,6 +88,7 @@ pub enum Val {
     Number(isize),
     Decimal(Float),
     List(Vec<TVal>),
+    Struct(BTreeMap<Trivia<SmolStr>, TVal>),
     Function(HashTrieMapSync<SmolStr, TVal>, Trivia<SmolStr>, TExpr),
     NativeFunction(NativeFunction),
 }
@@ -102,6 +103,7 @@ impl Hash for Val {
             Val::Number(n) => n.hash(state),
             Val::Decimal(d) => d.to_string().hash(state),
             Val::List(l) => l.hash(state),
+            Val::Struct(s) => s.hash(state),
             Val::Function(_, i, _) => i.hash(state),
             Val::NativeFunction(NativeFunction { name: i, .. }) => i.hash(state),
         };
@@ -124,6 +126,7 @@ impl PartialOrd for Val {
             (Val::String(l), Val::String(r)) => l.partial_cmp(r),
             (Val::Number(l), Val::Number(r)) => l.partial_cmp(r),
             (Val::Decimal(l), Val::Decimal(r)) => l.partial_cmp(r),
+            (Val::Struct(l), Val::Struct(r)) => l.partial_cmp(r),
             _ => unreachable!(),
         }
     }
@@ -138,6 +141,7 @@ impl Val {
             Val::Number(_) => "Number",
             Val::Decimal(_) => "Decimal",
             Val::List(_) => "List",
+            Val::Struct(_) => "Struct",
             Val::Function(_, _, _) => "Function",
             Val::NativeFunction(_) => "Builtin",
         }
@@ -177,6 +181,28 @@ impl WithTrivia for Trivia<Val> {
                 let line = format!("{buffer}List {}..{}", self.span.start, self.span.end);
                 let mut lines: Vec<String> =
                     list.iter().map(|x| x.pretty_string(indent + 2)).collect();
+                lines.insert(0, line);
+
+                lines.join("\n")
+            }
+            Val::Struct(map) => {
+                let line = format!("{buffer}Struct {}..{}", self.span.start, self.span.end);
+                let mut lines: Vec<String> = map
+                    .iter()
+                    .flat_map(|(k, v)| {
+                        [
+                            format!("{buffer}  Entry {}..{}", k.span.start, v.span.end),
+                            tagged_pretty_string(
+                                &k.inner,
+                                "Key",
+                                k.span.start,
+                                k.span.end,
+                                indent + 4,
+                            ),
+                            v.pretty_string(indent + 4),
+                        ]
+                    })
+                    .collect();
                 lines.insert(0, line);
 
                 lines.join("\n")

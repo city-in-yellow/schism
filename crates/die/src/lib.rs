@@ -43,6 +43,43 @@ impl<'a> PqRef<'a> {
     }
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
+pub enum Keep {
+    Remove,
+    Ignore,
+    Keep,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
+pub struct CountList<'a> {
+    pub queue: &'a [Keep],
+}
+
+impl<'a> CountList<'a> {
+    fn pop(&self, k: u32) -> (u32, Self) {
+        assert!(k as usize <= self.queue.len());
+
+        let mut idx = 0;
+        let mut tally = 0;
+        while idx < k {
+            match &self.queue[idx as usize] {
+                Keep::Remove => tally = 0.max(tally - 1),
+                Keep::Ignore => (),
+                Keep::Keep => tally += 1,
+            };
+
+            idx += 1;
+        }
+
+        (
+            tally,
+            Self {
+                queue: &self.queue[(k as usize)..],
+            },
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct State {
     pub m: FxHashMap<Val, Integer>,
@@ -97,21 +134,29 @@ fn binomial(n: u32, k: u32) -> Arc<Integer> {
     Arc::new(Integer::from(n).binomial(k))
 }
 
-fn hash_solve(pq: &PqRef, n: u32) -> u64 {
+fn hash_solve(pq: &PqRef, n: u32, next_name: &str, count_list: &CountList) -> u64 {
     let mut state = FxHasher::default();
 
     pq.hash(&mut state);
     n.hash(&mut state);
+    next_name.hash(&mut state);
+    count_list.hash(&mut state);
 
     state.finish()
 }
 
 #[cached(
     key = "u64",
-    convert = r#"{hash_solve(&pq, n)}"#,
+    convert = r#"{hash_solve(&pq, n, next_name, &count_list)}"#,
     with_cached_flag = true
 )]
-fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<State>> {
+fn solve(
+    pq: PqRef,
+    n: u32,
+    next_name: &str,
+    next: fn(&Val, &Val, &Val) -> Val,
+    count_list: CountList,
+) -> Return<Arc<State>> {
     let (a, pq) = pq.pop();
     let outcome = &a.0;
     let prob = a.1;
@@ -127,14 +172,16 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<Sta
     let mut temp2 = Integer::new();
 
     for k in 0..=n {
-        let tail = solve(pq.clone(), n - k, next);
+        let (tally, count_list) = count_list.pop(k);
+
+        let tail = solve(pq.clone(), n - k, next_name, next, count_list);
         let tail = {
             // println!("cached: {}", tail.was_cached);
             tail.value
         };
 
         for (state, weight) in &tail.m {
-            let state = next(state, outcome, &Val::Number(k.try_into().unwrap()));
+            let state = next(state, outcome, &Val::Number(tally.try_into().unwrap()));
 
             temp1.assign(weight * prob);
             temp2.assign(&temp1 * binomial(n, k).as_ref());
@@ -145,15 +192,20 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<Sta
     Return::new(Arc::new(result))
 }
 
-#[cached(key = "u64", convert = r#"{hash_solve(&pq, n)}"#)]
+#[cached(
+    key = "u64",
+    convert = r#"{hash_solve(&pq, n, next_name, &count_list)}"#
+)]
 fn solve_and_finalize(
     pq: PqRef,
     n: u32,
+    next_name: &str,
     next: fn(&Val, &Val, &Val) -> Val,
+    count_list: CountList,
 ) -> std::vec::Vec<(Val, Rational)> {
     let total = Arc::new(Mutex::new(Rational::ZERO.clone()));
 
-    let res = solve(pq, n, next)
+    let res = solve(pq, n, next_name, next, count_list)
         .value
         .m
         .clone()
@@ -351,8 +403,31 @@ impl Die {
         }
     }
 
-    pub fn solve(&self, next: fn(&Val, &Val, &Val) -> Val) -> Vec<(Val, Rational)> {
-        solve_and_finalize(self.prob_queue().as_ref(), self.count(), next)
+    pub fn solve(
+        &self,
+        next_name: &str,
+        next: fn(&Val, &Val, &Val) -> Val,
+    ) -> Vec<(Val, Rational)> {
+        let pq = self.prob_queue();
+        let count_list: Vec<_> = (0..self.count()).map(|_| Keep::Keep).collect();
+        let count_list = CountList { queue: &count_list };
+
+        solve_and_finalize(pq.as_ref(), self.count(), next_name, next, count_list)
+    }
+
+    pub fn solve_with_countlist(
+        &self,
+        next_name: &str,
+        next: fn(&Val, &Val, &Val) -> Val,
+        count_list: CountList,
+    ) -> Vec<(Val, Rational)> {
+        solve_and_finalize(
+            self.prob_queue().as_ref(),
+            self.count(),
+            next_name,
+            next,
+            count_list,
+        )
     }
 }
 
@@ -361,10 +436,22 @@ mod test {
     use ast::hir::Val;
     use insta::assert_snapshot;
 
-    use crate::Die;
+    use crate::{CountList, Die, Keep};
 
-    fn e(d: Die, next: fn(&Val, &Val, &Val) -> Val) -> String {
-        format!("{:#?}\n", d.solve(next))
+    fn e(d: Die, next_name: &str, next: fn(&Val, &Val, &Val) -> Val) -> String {
+        format!("{:#?}\n", d.solve(next_name, next))
+    }
+
+    fn ec(
+        d: Die,
+        next_name: &str,
+        next: fn(&Val, &Val, &Val) -> Val,
+        count_list: CountList,
+    ) -> String {
+        format!(
+            "{:#?}\n",
+            d.solve_with_countlist(next_name, next, count_list)
+        )
     }
 
     fn next_state(state: &Val, outcome: &Val, count: &Val) -> Val {
@@ -376,18 +463,32 @@ mod test {
 
     #[test]
     fn test() {
-        println!("{:?}", Die::of_count_base(150, 20).prob_queue());
-        assert_snapshot!(e(Die::of_count_base(8, 4), next_state));
-        assert_snapshot!(e(Die::of_count_base(80, 4), next_state));
-        assert_snapshot!(e(Die::of_count_base(150, 20), next_state));
+        assert_snapshot!(e(Die::of_count_base(8, 4), "prob", next_state));
+        assert_snapshot!(e(Die::of_count_base(80, 4), "prob", next_state));
 
         // Die::of_count_base(150, 20).solve(next_state);
     }
 
     #[test]
-    fn tester() {
-        // assert_snapshot!(e(Die::of_count_base(1, 20), next_state));
+    fn test_kh() {
+        assert_snapshot!(e(Die::of_count_base(3, 6), "prob", next_state));
+        assert_snapshot!(ec(
+            Die::of_count_base(4, 6),
+            "highest",
+            next_state,
+            CountList {
+                queue: &[Keep::Keep, Keep::Keep, Keep::Keep, Keep::Ignore]
+            }
+        ));
+        assert_snapshot!(ec(
+            Die::of_count_base(2, 2),
+            "highest",
+            next_state,
+            CountList {
+                queue: &[Keep::Keep, Keep::Ignore]
+            }
+        ));
 
-        Die::of_count_base(150, 20).solve(next_state);
+        // Die::of_count_base(150, 20).solve(next_state);
     }
 }

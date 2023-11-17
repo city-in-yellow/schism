@@ -1,0 +1,19 @@
+---
+source: crates/die/src/lib.rs
+expression: "ec(Die::of_count_base(2, 2), \"prob\", next_state,\n    CountList { queue: &[Keep::Keep, Keep::Ignore] })"
+---
+[
+    (
+        Number(
+            2,
+        ),
+        1/2,
+    ),
+    (
+        Number(
+            3,
+        ),
+        1/2,
+    ),
+]
+
