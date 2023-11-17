@@ -5,7 +5,7 @@ use cached::{proc_macro::cached, Return};
 use fxhash::{FxBuildHasher, FxHashMap, FxHasher};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
-use rug::{Integer, Rational};
+use rug::{Assign, Integer, Rational};
 use smol_str::SmolStr;
 use std::{
     cmp::Ordering,
@@ -94,8 +94,8 @@ fn pq_from_base(base: u32) -> Pq {
 }
 
 #[cached]
-fn binomial(n: u32, k: u32) -> Integer {
-    Integer::from(n).binomial(k)
+fn binomial(n: u32, k: u32) -> Arc<Integer> {
+    Arc::new(Integer::from(n).binomial(k))
 }
 
 fn hash_solve(pq: &PqRef, n: u32) -> u64 {
@@ -123,6 +123,10 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<Sta
     };
 
     let mut result = State::new();
+
+    let mut temp1 = Integer::new();
+    let mut temp2 = Integer::new();
+
     for k in 0..=n {
         let tail = solve(pq.clone(), n - k, next);
         let tail = {
@@ -132,8 +136,10 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<Sta
 
         for (state, weight) in &tail.m {
             let state = next(state, outcome, &Val::Number(k.try_into().unwrap()));
-            let weight = weight * binomial(n, k) * prob as u128;
-            result.insert(state, weight);
+
+            temp1.assign(weight * prob);
+            temp2.assign(&temp1 * binomial(n, k).as_ref());
+            result.insert(state, temp2.clone());
         }
     }
 
