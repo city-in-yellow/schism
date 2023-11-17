@@ -25,7 +25,7 @@ impl Pq {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub struct PqRef<'a> {
     pub queue: &'a [Arc<(Val, u32)>],
 }
@@ -41,14 +41,6 @@ impl<'a> PqRef<'a> {
                 queue: &self.queue[1..],
             },
         )
-    }
-}
-
-impl<'a> Hash for PqRef<'a> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for a in self.queue {
-            a.hash(state);
-        }
     }
 }
 
@@ -83,6 +75,11 @@ impl State {
             .from_key(&k)
             .or_insert(k, Integer::ZERO)
             .1 += v;
+
+        // match self.m.remove(&k) {
+        //     None => self.m.insert(k, v),
+        //     Some(vv) => self.m.insert(k, v + vv),
+        // };
     }
 }
 
@@ -126,7 +123,7 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<Sta
     };
 
     let mut result = State::new();
-    for k in 0..n {
+    for k in 0..=n {
         let tail = solve(pq.clone(), n - k, next);
         let tail = {
             // println!("cached: {}", tail.was_cached);
@@ -135,8 +132,8 @@ fn solve(pq: PqRef, n: u32, next: fn(&Val, &Val, &Val) -> Val) -> Return<Arc<Sta
 
         for (state, weight) in &tail.m {
             let state = next(state, outcome, &Val::Number(k.try_into().unwrap()));
-            let next_weight = weight * binomial(n, k) * prob as u128;
-            result.insert(state, next_weight);
+            let weight = weight * binomial(n, k) * prob as u128;
+            result.insert(state, weight);
         }
     }
 
@@ -374,10 +371,17 @@ mod test {
 
     #[test]
     fn test() {
-        // println!("{:?}", Die::of_count_base(150, 20).prob_queue());
-        // assert_snapshot!(e(Die::of_count_base(8, 4), next_state));
-        // assert_snapshot!(e(Die::of_count_base(80, 4), next_state));
-        // assert_snapshot!(e(Die::of_count_base(150, 20), next_state));
+        println!("{:?}", Die::of_count_base(150, 20).prob_queue());
+        assert_snapshot!(e(Die::of_count_base(8, 4), next_state));
+        assert_snapshot!(e(Die::of_count_base(80, 4), next_state));
+        assert_snapshot!(e(Die::of_count_base(150, 20), next_state));
+
+        // Die::of_count_base(150, 20).solve(next_state);
+    }
+
+    #[test]
+    fn tester() {
+        // assert_snapshot!(e(Die::of_count_base(1, 20), next_state));
 
         Die::of_count_base(150, 20).solve(next_state);
     }

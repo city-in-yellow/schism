@@ -1,0 +1,13 @@
+---
+source: crates/die/src/lib.rs
+expression: "e(Die::of_count_base(1, 20), next_state)"
+---
+[
+    (
+        Number(
+            1,
+        ),
+        1,
+    ),
+]
+
